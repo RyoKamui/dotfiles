@@ -1,0 +1,48 @@
+#!/bin/sh
+# Global commit-msg hook: validate Conventional Commits.
+# Scoped to repos under ~/Documents/Git via includeIf in ~/.gitconfig.
+# Repo-local core.hooksPath (e.g. ipas -> githooks) overrides this.
+
+msg="$1"
+subject=$(grep -v '^#' "$msg" | head -n 1)
+
+# Pass through commits that don't fit the pattern by design.
+case "$subject" in
+  Merge*|Revert*|"fixup! "*|"squash! "*) exit 0 ;;
+esac
+
+pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9._/-]+\))?!?: .+'
+
+if ! printf '%s\n' "$subject" | grep -Eq "$pattern"; then
+  cat >&2 <<EOF
+Commit rejected: "$subject"
+
+Expected Conventional Commits format:
+
+  <type>(<scope>)!: <description>
+
+  types:    feat fix docs style refactor perf test build ci chore revert
+  scope:    optional, e.g. (worker), (api), (ui)
+  breaking: put ! before the colon and a "BREAKING CHANGE: ..." footer in the body
+
+Examples:
+  feat(api): add pagination to the search endpoint
+  fix: handle empty responses from the decrypt service
+
+To bypass once:      git commit --no-verify
+To opt a repo out:   git config core.hooksPath <dir>  (repo-local overrides global)
+EOF
+  exit 1
+fi
+
+length=${#subject}
+if [ "$length" -gt 100 ]; then
+  echo "Commit rejected: subject is $length chars (hard limit 100)." >&2
+  exit 1
+fi
+
+# A body must be separated from the subject by exactly one blank line.
+if [ "$(grep -cv '^#' "$msg")" -gt 1 ] && [ -n "$(sed -n '2p' "$msg" | grep -v '^#')" ]; then
+  echo "Commit rejected: line 2 must be blank (separate the subject from the body)." >&2
+  exit 1
+fi

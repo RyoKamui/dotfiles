@@ -1,0 +1,14 @@
+# Conventional commit — format: <type>(<scope>)!: <description>
+#
+# type:    feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert
+# scope:   optional component, e.g. (parser), (ui), (pipeline)
+# summary: imperative, lowercase start, no trailing period
+#
+# feat(parser): handle empty input gracefully
+# fix: stop retry loop from blocking shutdown
+#
+# Leave a blank line, then the body: explain WHY.
+# Mark incompatible changes with ! before the colon and a
+# "BREAKING CHANGE: ..." footer in the body.
+#
+# Lines starting with # are stripped automatically.

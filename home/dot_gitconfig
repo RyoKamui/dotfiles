@@ -8,6 +8,15 @@
 
 [commit]
         gpgsign = true
+	template = ~/.config/git/commit-template.txt
 
 [tag]
         gpgsign = true
+[credential "https://github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[core]
+	hooksPath = ~/.config/git/hooks
