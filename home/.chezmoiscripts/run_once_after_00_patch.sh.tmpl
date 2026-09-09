@@ -47,8 +47,9 @@ duti -s com.movist.MovistPro .mp4 all 2>/dev/null                               
 # ■ SECTION: HOSTS & PATCHES
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Append entries to /etc/hosts to block certain connections
-echo -e "127.0.0.1 daisydiskapp.com\n127.0.0.1 api.devontechnologies.com" | sudo tee -a /etc/hosts >/dev/null                                          # Block DaisyDisk and DEVONthink license checks
+# Append entries to /etc/hosts to block certain connections (idempotent:
+# the script re-runs whenever its content changes)
+grep -q "daisydiskapp.com" /etc/hosts || echo -e "127.0.0.1 daisydiskapp.com\n127.0.0.1 api.devontechnologies.com" | sudo tee -a /etc/hosts >/dev/null # Block DaisyDisk and DEVONthink license checks
 sudo killall -HUP mDNSResponder                                                                                                                        # Flush the DNS cache
 
 # Patch Bloom with a license key
@@ -102,13 +103,16 @@ if [ -f "$tinyhook_dir/build.sh" ]; then
     cd "$tinyhook_dir" && ./build.sh
 fi
 
-# Run init.sh on all apps that exist in both /Applications and apps.json
+# Run init.sh on all apps that exist in both /Applications and apps.json.
+# --mac: some names (Surge) exist on both platforms and apps.json ".apps" is
+# the macOS section, so pin the platform. Targets without a source (Backdrop,
+# CrossOver, Supercharge) are post-script-only and resolve via apps.json.
 if [ -f "$tinyhook_dir/apps.json" ] && [ -f "$tinyhook_dir/init.sh" ]; then
     jq -r '.apps[].app_name' "$tinyhook_dir/apps.json" | while IFS= read -r app_name; do
         app_path="/Applications/${app_name}.app"
         if [ -d "$app_path" ]; then
             echo -e "\033[1;32m[Autopatch]\033[0m Patching ${app_name}..."
-            cd "$tinyhook_dir" && ./init.sh "$app_name" -y
+            cd "$tinyhook_dir" && ./init.sh "$app_name" --mac -y
             ensure_patched_app_signature "$app_path" "$app_name"
         fi
     done
