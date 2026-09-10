@@ -109,6 +109,9 @@ fi
 # CrossOver, Supercharge) are post-script-only and resolve via apps.json.
 if [ -f "$tinyhook_dir/apps.json" ] && [ -f "$tinyhook_dir/init.sh" ]; then
     jq -r '.apps[].app_name' "$tinyhook_dir/apps.json" | while IFS= read -r app_name; do
+        # Hopper arrives prepatched (custom-apps installs the 6.2.1 zip);
+        # tinyhook's patch flow would re-patch an already-patched binary.
+        [[ "$app_name" == "Hopper Disassembler" ]] && continue
         app_path="/Applications/${app_name}.app"
         if [ -d "$app_path" ]; then
             echo -e "\033[1;32m[Autopatch]\033[0m Patching ${app_name}..."
