@@ -7,19 +7,6 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
-  "agent_servers": {
-    "gemini": {
-      "type": "registry"
-    },
-    "claude-acp": {
-      "favorite_config_option_values": {
-        "mode": [
-          "dontAsk"
-        ]
-      },
-      "type": "registry"
-    }
-  },
   "telemetry": {
     "diagnostics": false,
     "metrics": false
