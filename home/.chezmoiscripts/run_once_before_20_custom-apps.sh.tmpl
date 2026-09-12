@@ -7,23 +7,94 @@
 # This script downloads, extracts, and installs custom applications not available
 # through package managers.
 
+setopt NULL_GLOB # Skip the loops below instead of iterating over a literal '*' when nothing matches
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ■ SECTION: CUSTOM APPLICATIONS
+# ■ SECTION: APPLICATION SOURCES
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Define the URLs for the application packages to be downloaded
-urls=(
-    "https://betamagic.nl/downloads/News%20Explorer%20Retail.zip"
-    "https://github.com/RyoKamui/assets/releases/download/Binaries/Cling.v2.7.1.zip"
-    "https://github.com/RyoKamui/assets/releases/download/Binaries/DriveDx.v1.12.1.zip"
-    "https://github.com/RyoKamui/assets/releases/download/Binaries/Hopper.Disassembler.v6.2.1.zip"
-    "https://github.com/RyoKamui/assets/releases/download/Binaries/IDA.Professional.v9.4.zip"
-    "https://github.com/RyoKamui/assets/releases/download/Binaries/Pixelmator.Pro.v.4.0.zip"
-    "https://github.com/RyoKamui/assets/releases/download/Binaries/Rclone.Browser.zip"
-    "https://github.com/sindresorhus/supercharge-meta/releases/download/v1.29.4/Supercharge.zip"
+# Packages to install, read from GitHub releases at runtime in "<owner/repo> <tag or
+# latest> <comma-separated app names>" form. An app is matched against the asset names
+# of its release by prefix and the highest version wins, so a name is all that belongs
+# here: new uploads, and the versions they carry, need no change in this file.
+release_specs=(
+    "RyoKamui/assets Binaries Cling,DriveDx,Hopper.Disassembler,IDA.Professional,Nucleus,Pixelmator.Pro"
+    "sindresorhus/supercharge-meta latest Supercharge"
 )
 
-# Create a temporary directory named 'temp' and navigate into it
+# Packages hosted outside of a GitHub release, which still need a pinned URL
+pinned_urls=(
+    "https://betamagic.nl/downloads/News%20Explorer%20Retail.zip"
+)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ■ SECTION: RESOLVE LATEST RELEASE ASSETS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# jq ships with macOS, jaq is the Homebrew alternative
+json_tool="jq"
+command -v jq >/dev/null 2>&1 || json_tool="jaq"
+if ! command -v "$json_tool" >/dev/null 2>&1; then
+    echo -e "\033[1;31m[ERROR]\033[0m Neither jq nor jaq is available, aborting"
+    exit 1
+fi
+
+# Reads the metadata of one release, `gh` first because it is authenticated (higher
+# rate limit) with curl as the fallback. The "latest" tag asks for the newest published
+# release of a repo, anything else is a tag name.
+fetch_release() {
+    local repo="$1" tag="$2" endpoint json=""
+    if [[ "$tag" == "latest" ]]; then
+        endpoint="releases/latest"
+    else
+        endpoint="releases/tags/${tag}"
+    fi
+    if command -v gh >/dev/null 2>&1; then
+        json=$(gh api "repos/${repo}/${endpoint}" 2>/dev/null) || json=""
+    fi
+    if [[ -z "$json" ]]; then
+        json=$(curl -fsSL --retry 3 -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${repo}/${endpoint}" 2>/dev/null) || json=""
+    fi
+    print -r -- "$json"
+}
+
+# Prints "<asset name>\t<download url>" for the newest asset of an app
+latest_asset() {
+    local json="$1" app="$2"
+    print -r -- "$json" | "$json_tool" -r --arg app "$app" '
+        def version_key:
+            ((.name | capture("v(?<v>[0-9]+([.][0-9]+)*)") // {v: "0"}).v | split(".") | map(tonumber));
+        [ .assets[]
+          | select((.name | ascii_downcase) | startswith(($app | ascii_downcase) + ".")) ]
+        | sort_by(version_key) | (.[-1] // empty)
+        | [.name, .browser_download_url] | @tsv'
+}
+
+# Build the final list of packages to download
+urls=("${pinned_urls[@]}")
+for spec in "${release_specs[@]}"; do
+    read -r repo tag apps <<< "$spec"
+    release=$(fetch_release "$repo" "$tag")
+    if [[ -z "$release" ]]; then
+        echo -e "\033[1;31m[ERROR]\033[0m Unable to read the ${tag} release of ${repo}, aborting"
+        exit 1
+    fi
+    for app in ${(s:,:)apps}; do
+        if ! resolved=$(latest_asset "$release" "$app") || [[ -z "$resolved" ]]; then
+            echo -e "\033[1;33m[WARN]\033[0m No ${repo} asset found for ${app}, skipping"
+            continue
+        fi
+        echo -e "\033[1;32m[Resolved]\033[0m ${app} -> ${resolved%%$'\t'*}"
+        urls+=("${resolved#*$'\t'}")
+    done
+done
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ■ SECTION: DOWNLOAD, EXTRACT AND INSTALL
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Create a temporary working directory and navigate into it
 tmp_dir="$HOME/temp-apps"
 mkdir -p "$tmp_dir"
 cd "$tmp_dir"
@@ -32,10 +103,14 @@ cd "$tmp_dir"
 echo -e "\033[1;34m[INFO]\033[0m Initiating download of application packages..."
 for url in "${urls[@]}"; do
     echo -e "\033[1;32m[Downloading]\033[0m $url"
-    curl -L -O "$url"
+    # -f keeps a 404 from being saved as a bogus archive, so a moved asset is loud
+    if ! curl -fL --retry 3 --retry-delay 2 -O "$url"; then
+        echo -e "\033[1;31m[ERROR]\033[0m Failed to download $url"
+        rm -f "${url##*/}"
+    fi
 done
 
-# Unzip all the downloaded .zip files in the 'temp' directory
+# Unzip all the downloaded .zip files in the temporary directory
 echo -e "\033[1;34m[INFO]\033[0m Extracting all .zip files..."
 for zip_file in *.zip; do
     echo -e "\033[1;32m[Extracting]\033[0m $zip_file"
@@ -44,30 +119,30 @@ done
 
 # Install the .app directories
 echo -e "\033[1;34m[INFO]\033[0m Installing applications to /Applications..."
-for app_dir in *.app; do
-    if [ -d "$app_dir" ]; then
-        app_name=$(basename "$app_dir")
-        app_dest="/Applications/$app_name"
+for app_dir in *.app(/); do
+    app_name=$(basename "$app_dir")
+    app_dest="/Applications/$app_name"
 
-        # Check if the application already exists in /Applications/ and remove the existing version if necessary
-        if [ -d "$app_dest" ]; then
-            echo -e "\033[1;33m[INFO]\033[0m Removing existing version of $app_name in /Applications/"
-            sudo rm -rf "$app_dest"
-        fi
-
-        # Move the new application to /Applications/
-        echo -e "\033[1;32m[Installing]\033[0m $app_name to /Applications/"
-        sudo mv "$app_dir" /Applications/
-
-        # Clear extended attributes on the moved app
-        echo -e "\033[1;32m[Dequarantine]\033[0m Removing extended attributes for $app_name"
-        sudo xattr -cr "/Applications/$app_name"
+    # Check if the application already exists in /Applications/ and remove the existing version if necessary
+    if [ -d "$app_dest" ]; then
+        echo -e "\033[1;33m[INFO]\033[0m Removing existing version of $app_name in /Applications/"
+        sudo rm -rf "$app_dest"
     fi
+
+    # Move the new application to /Applications/
+    echo -e "\033[1;32m[Installing]\033[0m $app_name to /Applications/"
+    sudo mv "$app_dir" /Applications/
+
+    # Clear extended attributes on the moved app
+    echo -e "\033[1;32m[Dequarantine]\033[0m Removing extended attributes for $app_name"
+    sudo xattr -cr "/Applications/$app_name"
 done
 
-# Configure IDA Pro to use the system Python 3
+# Configure IDA Pro to use the system Python 3 (its bundle folder carries the version)
 echo -e "\033[1;34m[INFO]\033[0m Configuring IDA Pro Python 3..."
-"/Applications/IDA Professional 9.3.app/Contents/MacOS/idapyswitch" --auto-apply
+for idapyswitch in /Applications/IDA\ Professional*.app/Contents/MacOS/idapyswitch; do
+    sudo "$idapyswitch" --auto-apply
+done
 
 # Cleanup: Remove the temporary directory after the operation is complete
 echo -e "\033[1;34m[INFO]\033[0m Done, removing temporary directory..."
