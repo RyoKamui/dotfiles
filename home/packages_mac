@@ -49,7 +49,6 @@ brew 'qt'                                                        # Cross-platfor
 brew 'rustup'                                                    # The Rust toolchain installer
 brew 'uv'                                                        # Extremely fast Python package installer and resolver
 brew 'volta'                                                     # The Hassle-Free JavaScript Tool Manager
-brew 'gemini-cli'                                                # Interact with Google Gemini AI models from the command-line
 
 cask 'devtoys'                                                   # A Swiss Army knife for developers
 cask 'fork'                                                      # A fast and friendly git client for Mac and Windows
