@@ -1,5 +1,8 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
+# Slow modules (git_status on big repos) time out silently at the 500ms default
+command_timeout = 2000
+
 format = """
 $username\
 $hostname\
@@ -33,9 +36,11 @@ format = "[$branch]($style)"
 style = "bright-black"
 
 [git_status]
+# Zero-width spaces keep the classic tutorial look: the "(N" group shows dirty counts
+# while individual symbols stay invisible. Conflicts are deliberately left visible below.
 format = "[[(*$conflicted$untracked$modified$staged$renamed$deleted)](218) ($ahead_behind$stashed)]($style)"
 style = "cyan"
-conflicted = "​"
+conflicted = "!"
 untracked = "​"
 modified = "​"
 staged = "​"
