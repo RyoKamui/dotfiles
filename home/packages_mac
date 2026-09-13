@@ -94,7 +94,6 @@ cask 'hazel'                                                     # Automated org
 cask 'app-cleaner'                                               # Uninstall apps and delete leftovers
 cask 'betterdisplay'                                             # Display management tool
 cask 'bloom'                                                     # Multi-platform file manager
-cask 'codexbar'                                                  # Menu bar usage monitor for Codex and Claude
 cask 'daisydisk'                                                 # Disk space analyzer
 cask 'finetune'                                                  # Per-application volume mixer, equalizer, and audio router
 cask 'find-any-file'                                             # File search utility
