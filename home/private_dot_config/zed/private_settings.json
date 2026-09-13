@@ -13,10 +13,37 @@
   },
   "ui_font_size": 16,
   "buffer_font_size": 15,
+  "buffer_font_family": "Hack Nerd Font Mono",
+  "autosave": "on_focus_change",
+  "show_edit_predictions": false,
   "theme": {
     "mode": "system",
     "light": "One Light",
     "dark": "Catppuccin Macchiato",
+  },
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.svn",
+    "**/.hg",
+    "**/.jj",
+    "**/.sl",
+    "**/.repo",
+    "**/CVS",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "**/.classpath",
+    "**/.settings",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/dist",
+    "**/*.i64",
+    "**/*.idb",
+    "**/*.hop"
+  ],
+  "terminal": {
+    "font_family": "Hack Nerd Font Mono",
+    "option_as_meta": true
   },
   "languages": {
     "JSON": {
