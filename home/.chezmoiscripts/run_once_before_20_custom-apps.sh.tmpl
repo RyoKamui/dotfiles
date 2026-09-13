@@ -11,6 +11,7 @@ setopt NULL_GLOB # Skip the loops below instead of iterating over a literal '*' 
 
 deploy_log="$HOME/.local/state/chezmoi-deploy.log"
 mkdir -p "${deploy_log:h}"
+sed -i "" '/^custom-apps: /d' "$deploy_log" 2>/dev/null # drop last run's entries; a success now leaves no trace
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ■ SECTION: APPLICATION SOURCES
@@ -90,7 +91,7 @@ for spec in "${release_specs[@]}"; do
         # Skip this repo's apps after exhausting retries instead of exit 1, so the
         # remaining specs and pinned URLs still install on this run
         echo -e "\033[1;31m[WARN]\033[0m Skipping ${repo} apps after repeated failures; re-run the script when the API recovers"
-        echo "custom-apps: ${repo} release metadata unavailable — re-run: chezmoi state forget-key 'script:home/.chezmoiscripts/run_once_before_20_custom-apps.sh.tmpl' && chezmoi apply" >> "$deploy_log"
+        echo "custom-apps: ${repo} release metadata unavailable — re-run: chezmoi state delete --bucket=run_once --key="$HOME/.chezmoiscripts/20_custom-apps.sh" && chezmoi apply" >> "$deploy_log"
         continue
     fi
     for app in ${(s:,:)apps}; do

@@ -17,6 +17,7 @@
 typinator_tmp="$HOME/temp-typinator"
 deploy_log="$HOME/.local/state/chezmoi-deploy.log"
 mkdir -p "$HOME/.local/state"
+sed -i "" '/^imports: /d' "$deploy_log" 2>/dev/null # drop last run's entries; a success now leaves no trace
 mkdir -p "$typinator_tmp"
 for tyset in symbols sysadmin; do
     curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 300 \

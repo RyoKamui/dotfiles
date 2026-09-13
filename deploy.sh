@@ -137,5 +137,12 @@ if ! retry "chezmoi init" 2 chezmoi init RyoKamui; then
     fi
 fi
 
-# Apply configurations using chezmoi
-chezmoi apply
+# Apply configurations using chezmoi. A non-zero exit usually means the
+# deployment summary (run_once_after_99_summary) left failed stages re-armed on
+# purpose; its printed box explains what to expect, so report instead of
+# crashing the tail of the deploy
+if chezmoi -v apply; then
+    echo "✓ Deploy complete."
+else
+    echo -e "\033[1;33m⚠ Deploy finished with incomplete stages — run 'chezmoi apply' again to retry them automatically.\033[0m"
+fi
