@@ -1,3 +1,7 @@
+{{- /* Media volume first: save straight onto the Stargate drive's Downloads
+     folder, falling back to ~/Downloads when the drive is not mounted. */ -}}
+{{- $savePath := printf "%s/Downloads" .chezmoi.homeDir -}}
+{{- if stat "/Volumes/Stargate" }}{{ $savePath = "/Volumes/Stargate/Downloads" }}{{ end -}}
 [AboutDialog]
 Size=@Size(545 366)
 
@@ -32,11 +36,10 @@ Size=@Size(360 450)
 Session\AddTorrentStopped=false
 Session\BTProtocol=TCP
 Session\ConnectionSpeed=500
-Session\DefaultSavePath={{ .chezmoi.homeDir }}/Downloads
+Session\DefaultSavePath={{ $savePath }}
 Session\DiskCacheSize=2048
 Session\IPFilter=
 Session\IPFilteringEnabled=false
-Session\MaxConcurrentHTTPAnnounces=75
 Session\MaxConcurrentHTTPAnnounces=75
 Session\MaxConnections=1500
 Session\MaxConnectionsPerTorrent=300
@@ -53,8 +56,8 @@ Session\SendBufferWatermarkFactor=300
 Session\ShareLimitAction=Stop
 Session\SocketBacklogSize=30000
 Session\StartPaused=false
-Session\TempPath={{ .chezmoi.homeDir }}/Downloads/temp
-Session\TempPathEnabled=false
+Session\TempPath={{ $savePath }}/temp
+Session\TempPathEnabled=true
 
 [Core]
 AutoDeleteAddedTorrentFile=Never
