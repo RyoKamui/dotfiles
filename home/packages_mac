@@ -170,4 +170,3 @@ cask 'font-noto-sans-cjk'                                        # Noto Sans CJK
 mas 'APTV', id: 1630403500
 mas 'uBlock Origin Lite', id: 6745342698
 mas 'Xcode', id: 497799835
-# mas 'Lookupper', id: 1667225994
