@@ -46,8 +46,8 @@ retry() {
             echo "WARN: ${desc} failed after ${max} attempts, continuing..."
             return 1
         fi
-        echo "Retrying ${desc} (attempt ${n}/${max}) in 10s..."
-        sleep 10
+        echo "Retrying ${desc} (attempt ${n}/${max}) in 5s..."
+        sleep 5
         n=$((n + 1))
     done
 }

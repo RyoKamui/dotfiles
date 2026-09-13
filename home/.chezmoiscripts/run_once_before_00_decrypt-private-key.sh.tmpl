@@ -6,6 +6,10 @@
 # This script ensures the private age key for chezmoi is decrypted and has the correct
 # permissions, prompting for a passphrase if necessary.
 
+# Reset the cross-script deployment failure log, aggregated by run_once_after_99_summary
+mkdir -p "$HOME/.local/state"
+: > "$HOME/.local/state/chezmoi-deploy.log"
+
 # Only run if the decrypted key does not already exist
 if [ ! -f "${HOME}/.config/chezmoi/key.txt" ]; then
     mkdir -p "${HOME}/.config/chezmoi"

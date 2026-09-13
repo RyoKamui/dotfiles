@@ -1,0 +1,27 @@
+{{- if (eq .chezmoi.os "darwin") -}}
+#!/usr/bin/env zsh
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ■ DEPLOYMENT SUMMARY
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Runs last in the chain and prints everything the fail-soft scripts recorded
+# in the shared log, so incomplete stages are impossible to miss. The log file
+# itself is kept for post-mortem inspection; run_once_before_00 truncates it at
+# the start of the next full deploy.
+
+deploy_log="$HOME/.local/state/chezmoi-deploy.log"
+
+if [[ -s "$deploy_log" ]]; then
+    echo ""
+    echo -e "\033[1;33m┏━━ Deployment finished with $(wc -l < "$deploy_log" | tr -d ' ') incomplete stage(s) ━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+    while IFS= read -r line; do
+        echo -e "  \033[1;31m✗\033[0m $line"
+    done < "$deploy_log"
+    echo -e "\033[1;33m┃ Complete a stage, then fix it by hand or re-run it with its forget-key command.\033[0m"
+    echo -e "\033[1;33m┃ Full log: ${deploy_log}\033[0m"
+    echo -e "\033[1;33m┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+else
+    echo -e "\033[1;32m✔ Deployment complete — every stage succeeded.\033[0m"
+fi
+exit 0
+{{ end -}}

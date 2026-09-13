@@ -15,6 +15,8 @@
 # Import Typinator expansion sets (-f so an error page is never saved as an archive,
 # and a failed fetch only skips that set instead of running unzip/open on garbage)
 typinator_tmp="$HOME/temp-typinator"
+deploy_log="$HOME/.local/state/chezmoi-deploy.log"
+mkdir -p "$HOME/.local/state"
 mkdir -p "$typinator_tmp"
 for tyset in symbols sysadmin; do
     curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 300 \
@@ -22,7 +24,7 @@ for tyset in symbols sysadmin; do
         "https://github.com/RyoKamui/assets/raw/main/cfgs/typinator/$tyset.tyset.zip" && \
     unzip -q "$typinator_tmp/$tyset.tyset.zip" -d "$typinator_tmp" && \
     echo -e "\033[1;32m[Imported]\033[0m $tyset.tyset" || \
-    echo -e "\033[1;33m[WARN]\033[0m Failed to fetch $tyset.tyset, skipping it"
+    { echo -e "\033[1;33m[WARN]\033[0m Failed to fetch $tyset.tyset, skipping it"; echo "imports: typinator ${tyset}.tyset fetch/extract failed" >> "$deploy_log"; }
 done
 if [[ -d "$typinator_tmp/symbols.tyset" || -d "$typinator_tmp/sysadmin.tyset" ]]; then
     open "$typinator_tmp"/*.tyset                                                                                                              # Import into Typinator

@@ -19,6 +19,8 @@ set -uf -o pipefail
 
 # Steps that permanently failed after all retries, reported in the final summary
 failed_steps=()
+deploy_log="$HOME/.local/state/chezmoi-deploy.log"
+mkdir -p "${deploy_log:h}"
 
 # step <description> <attempts> <function>: run a function with retries and a backoff,
 # recording a permanent failure instead of aborting the script
@@ -28,12 +30,13 @@ step() {
     while ! "$@"; do
         if (( attempt >= max )); then
             echo -e "\033[1;31m[FAIL]\033[0m ${desc} (after ${attempt} attempts) — re-run manually: $*"
+            echo "init: ${desc} — re-run: $*" >> "$deploy_log"
             failed_steps+="${desc}"
             return 0
         fi
-        echo -e "\033[1;33m[RETRY]\033[0m ${desc} failed (attempt ${attempt}/${max}), retrying in 10s..."
+        echo -e "\033[1;33m[RETRY]\033[0m ${desc} failed (attempt ${attempt}/${max}), retrying in 5s..."
         (( attempt += 1 ))
-        sleep 10
+        sleep 5
     done
     echo -e "\033[1;32m[OK]\033[0m ${desc}"
 }
@@ -104,6 +107,7 @@ step "Homebrew" 2 install_homebrew
 # Without brew nothing downstream can proceed; this stays a hard stop by design
 if ! command -v brew >/dev/null 2>&1; then
     echo -e "\033[1;31m[ERROR]\033[0m Homebrew is unavailable, cannot continue. Fix the network and re-run 'chezmoi apply'."
+    echo "init: Homebrew install failed, deploy aborted — re-run: chezmoi apply" >> "$deploy_log"
     exit 1
 fi
 

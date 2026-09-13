@@ -13,6 +13,9 @@
 # ■ SECTION: ENVIRONMENT & UI
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+deploy_log="$HOME/.local/state/chezmoi-deploy.log"
+mkdir -p "${deploy_log:h}"
+
 # Ensure that the environment is correctly sourced in an interactive shell
 zsh -i -c "
     if [ -f \"$HOME/.zshenv\" ] || [ -f \"$HOME/.zshrc\" ]; then
@@ -84,9 +87,12 @@ if [ ! -d "$tinyhook_dir" ]; then
         git clone --depth 1 git@github.com:RyoKamui/tinyhook.git "$tinyhook_dir" && break
         echo -e "\033[1;33m[WARN]\033[0m tinyhook clone failed (attempt ${attempt}/3)"
         rm -rf "$tinyhook_dir"
-        sleep 10
+        sleep 5
     done
-    [[ -d "$tinyhook_dir" ]] || echo -e "\033[1;33m[WARN]\033[0m tinyhook unavailable, app patching skipped. Load a GitHub SSH key and re-run the patch script."
+    if [[ ! -d "$tinyhook_dir" ]]; then
+        echo -e "\033[1;33m[WARN]\033[0m tinyhook unavailable, app patching skipped. Load a GitHub SSH key and re-run the patch script."
+        echo "patch: tinyhook clone failed — load GitHub SSH key, then: chezmoi state forget-key 'script:home/.chezmoiscripts/run_once_after_00_patch.sh.tmpl' && chezmoi apply" >> "$deploy_log"
+    fi
 fi
 
 ensure_patched_app_signature() {
@@ -121,8 +127,8 @@ if [ -f "$tinyhook_dir/apps.json" ] && [ -f "$tinyhook_dir/init.sh" ]; then
         app_path="/Applications/${app_name}.app"
         if [ -d "$app_path" ]; then
             echo -e "\033[1;32m[Autopatch]\033[0m Patching ${app_name}..."
-            cd "$tinyhook_dir" && ./init.sh "$app_name" --mac -y
-            ensure_patched_app_signature "$app_path" "$app_name"
+            cd "$tinyhook_dir" && ./init.sh "$app_name" --mac -y || echo "patch: ${app_name} patch failed" >> "$deploy_log"
+            ensure_patched_app_signature "$app_path" "$app_name" || echo "patch: ${app_name} re-sign verification failed" >> "$deploy_log"
         fi
     done
 fi

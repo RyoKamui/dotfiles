@@ -9,6 +9,9 @@
 
 setopt NULL_GLOB # Skip the loops below instead of iterating over a literal '*' when nothing matches
 
+deploy_log="$HOME/.local/state/chezmoi-deploy.log"
+mkdir -p "${deploy_log:h}"
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ■ SECTION: APPLICATION SOURCES
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -61,7 +64,7 @@ fetch_release() {
         fi
         [[ -n "$json" ]] && break
         echo -e "\033[1;33m[WARN]\033[0m Unable to read the ${tag} release of ${repo} (attempt ${attempt}/3)"
-        sleep 15
+        sleep 5
     done
     print -r -- "$json"
 }
@@ -87,6 +90,7 @@ for spec in "${release_specs[@]}"; do
         # Skip this repo's apps after exhausting retries instead of exit 1, so the
         # remaining specs and pinned URLs still install on this run
         echo -e "\033[1;31m[WARN]\033[0m Skipping ${repo} apps after repeated failures; re-run the script when the API recovers"
+        echo "custom-apps: ${repo} release metadata unavailable — re-run: chezmoi state forget-key 'script:home/.chezmoiscripts/run_once_before_20_custom-apps.sh.tmpl' && chezmoi apply" >> "$deploy_log"
         continue
     fi
     for app in ${(s:,:)apps}; do
@@ -115,6 +119,7 @@ for url in "${urls[@]}"; do
     # -f keeps a 404 from being saved as a bogus archive, so a moved asset is loud
     if ! curl -fL --retry 3 --retry-delay 2 -O "$url"; then
         echo -e "\033[1;31m[ERROR]\033[0m Failed to download $url"
+        echo "custom-apps: download failed $url" >> "$deploy_log"
         rm -f "${url##*/}"
     fi
 done
@@ -123,7 +128,7 @@ done
 echo -e "\033[1;34m[INFO]\033[0m Extracting all .zip files..."
 for zip_file in *.zip; do
     echo -e "\033[1;32m[Extracting]\033[0m $zip_file"
-    unzip -q "$zip_file" || echo -e "\033[1;31m[ERROR]\033[0m Failed to extract $zip_file"
+    unzip -q "$zip_file" || { echo -e "\033[1;31m[ERROR]\033[0m Failed to extract $zip_file"; echo "custom-apps: extraction failed $zip_file" >> "$deploy_log"; }
 done
 
 # Install the .app directories
