@@ -140,6 +140,7 @@ brew "homebrew-ffmpeg/ffmpeg/ffmpeg", args: ["with-fdk-aac"]     # Play, record,
 brew 'wakeonlan'                                                 # Sends magic packets to wake up network-devices
 brew 'yt-dlp'                                                    # Feature-rich command-line audio/video downloader
 
+cask 'kumone'                                                    # Native client for NetEase Cloud Music
 cask 'movist-pro'                                                # Movie player based on QuickTime and FFmpeg
 cask 'qbittorrent'                                               # BitTorrent client
 

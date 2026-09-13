@@ -78,6 +78,10 @@ export PATH="$VOLTA_HOME/bin:$PATH"
 echo "Installing Node.js via Volta..."
 volta install node
 
+# OpenCode V2 CLI (provides opencode2)
+echo "Installing @opencode-ai/cli (opencode2)..."
+npm install -g @opencode-ai/cli@dev
+
 echo "Installing Rust via rustup-init..."
 rustup-init -y
 {{ end -}}
