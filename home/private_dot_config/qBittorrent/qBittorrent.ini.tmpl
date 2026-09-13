@@ -1,5 +1,3 @@
-{{- /* Media volume first: save straight onto the Stargate drive's Downloads
-     folder, falling back to ~/Downloads when the drive is not mounted. */ -}}
 {{- $savePath := printf "%s/Downloads" .chezmoi.homeDir -}}
 {{- if stat "/Volumes/Stargate" }}{{ $savePath = "/Volumes/Stargate/Downloads" }}{{ end -}}
 [AboutDialog]
