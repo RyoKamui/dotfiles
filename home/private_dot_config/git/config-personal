@@ -1,0 +1,5 @@
+# Scoped configuration for repositories under ~/Documents/Git.
+# Included from ~/.gitconfig via [includeIf "gitdir:~/Documents/Git/"].
+# A repo-local core.hooksPath still overrides this.
+[core]
+	hooksPath = ~/.config/git/hooks

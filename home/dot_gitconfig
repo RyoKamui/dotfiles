@@ -13,10 +13,13 @@
 [tag]
         gpgsign = true
 [credential "https://github.com"]
-	helper = 
+	helper =
 	helper = !/opt/homebrew/bin/gh auth git-credential
 [credential "https://gist.github.com"]
-	helper = 
+	helper =
 	helper = !/opt/homebrew/bin/gh auth git-credential
-[core]
-	hooksPath = ~/.config/git/hooks
+# Scoped config: the Conventional Commits commit-msg hook only applies to
+# repositories under ~/Documents/Git (see ~/.config/git/config-personal), so
+# third-party or work repos elsewhere keep git's default hooks.
+[includeIf "gitdir:~/Documents/Git/"]
+	path = ~/.config/git/config-personal

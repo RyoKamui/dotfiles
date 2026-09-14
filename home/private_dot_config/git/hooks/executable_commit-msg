@@ -42,7 +42,10 @@ if [ "$length" -gt 100 ]; then
 fi
 
 # A body must be separated from the subject by exactly one blank line.
-if [ "$(grep -cv '^#' "$msg")" -gt 1 ] && [ -n "$(sed -n '2p' "$msg" | grep -v '^#')" ]; then
+# Comments are stripped first, mirroring what git will actually commit —
+# otherwise a body glued under the subject slips past a literal "line 2" check.
+cleaned_msg=$(grep -v '^#' "$msg")
+if [ "$(printf '%s\n' "$cleaned_msg" | grep -c .)" -gt 1 ] && [ -n "$(printf '%s\n' "$cleaned_msg" | sed -n '2p')" ]; then
   echo "Commit rejected: line 2 must be blank (separate the subject from the body)." >&2
   exit 1
 fi
