@@ -129,7 +129,7 @@ cask 'trezor-suite'                                              # Security and 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ■ SECTION: COMMUNICATIONS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-cask 'telegram'                                                  # Messaging app with a focus on speed and security
+cask 'ayugram'                                                   # Telegram client with ghost mode and message history
 cask 'wechat'                                                    # Free messaging and calling app
 cask 'whatsapp'                                                  # Native desktop client for WhatsApp
 
