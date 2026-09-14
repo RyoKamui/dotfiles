@@ -1,0 +1,43 @@
+name: ci
+
+# Manual only: deploys are machine-local, so there is nothing to test per push.
+# This workflow is a one-click robot second opinion before a fresh-machine
+# deploy. It runs on a standard GitHub-hosted macOS runner — free for public
+# repositories, so it never touches the private-repo minutes quota.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install chezmoi + shellcheck
+        run: brew install chezmoi shellcheck
+
+      - name: Render all templates + zsh syntax check
+        run: |
+          set -euo pipefail
+          for f in home/.chezmoiscripts/*.tmpl; do
+            chezmoi execute-template < "$f" > /tmp/rendered.out
+            zsh -n /tmp/rendered.out
+            echo "ok: $f"
+          done
+          chezmoi execute-template < home/.chezmoi.toml.tmpl > /dev/null
+          echo "ok: home/.chezmoi.toml.tmpl"
+          chezmoi execute-template < home/.chezmoiignore.tmpl > /dev/null
+          echo "ok: home/.chezmoiignore.tmpl"
+
+      - name: shellcheck deploy.sh + commit-msg hook
+        # non-blocking: findings are reported but must not gate the run
+        continue-on-error: true
+        run: |
+          shellcheck deploy.sh
+          shellcheck -s sh home/private_dot_config/git/hooks/executable_commit-msg
+
+      - name: chezmoi doctor
+        run: chezmoi doctor
