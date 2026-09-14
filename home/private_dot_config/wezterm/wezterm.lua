@@ -17,11 +17,11 @@ config.scrollback_lines = 10000  -- Scrollback buffer (default 3500)
 config.check_for_updates = false  -- WezTerm is managed by Homebrew (cask 'wezterm')
 
 -- Dim panes that are not focused (helps spot the active split)
-config.colors = {
-  inactive_pane_hsb = {
-    saturation = 0.9,
-    brightness = 0.7,
-  },
+-- Note: inactive_pane_hsb is a TOP-LEVEL option, not part of config.colors
+-- (nesting it inside config.colors is rejected: "not a valid Palette field")
+config.inactive_pane_hsb = {
+  saturation = 0.9,
+  brightness = 0.7,
 }
 
 -- === Cursor Settings ===
@@ -37,7 +37,7 @@ config.window_decorations = "RESIZE"  -- Set window decorations (integrated butt
 config.native_macos_fullscreen_mode = false  -- Disables native fullscreen for macOS, use WezTerm's own fullscreen
 config.use_fancy_tab_bar = true  -- This separates tabs from titlebar controls
 config.tab_bar_at_bottom = false  -- Set to true if you want tabs at bottom
-config.hide_tab_bar_if_only_one_tab = true  -- No tab strip while only one tab is open
+config.hide_tab_bar_if_only_one_tab = false  -- Always show the tab bar, even with a single tab
 
 -- === Keybindings ===
 config.keys = {
@@ -77,8 +77,12 @@ config.keys = {
 -- Full reset: rm -rf ~/.local/share/wezterm/resurrect
 local resurrect = wezterm.plugin.require('https://github.com/MLFlexer/resurrect.wezterm')
 
--- Pin the snapshot dir explicitly (default depends on a helper plugin's path lookup)
-resurrect.state_manager.change_state_save_dir(wezterm.home_dir .. '/.local/share/wezterm/resurrect')
+-- Pin the snapshot dir explicitly (default depends on a helper plugin's path lookup).
+-- NOTE: the trailing slash is REQUIRED. The plugin builds paths as
+-- save_state_dir .. type .. '/name.json' without inserting a separator, so a dir
+-- without '/' produces broken paths like 'resurrectworkspace/default.json'
+-- and every save silently fails (errors only show up in the wezterm GUI log).
+resurrect.state_manager.change_state_save_dir(wezterm.home_dir .. '/.local/share/wezterm/resurrect/')
 
 -- Autosave the workspace every 15 minutes (crash/reboot safety net)
 resurrect.state_manager.periodic_save()
@@ -117,7 +121,7 @@ local session_keys = {
           local state = resurrect.state_manager.load_state(id, 'tab')
           resurrect.tab_state.restore_tab(pane:tab(), state, opts)
         end
-      end)
+      end, { ignore_screen_width = false })
     end),
   },
   -- CMD+Shift+D: delete a saved snapshot
@@ -133,6 +137,8 @@ local session_keys = {
         description = 'Select State to Delete and press Enter = accept, Esc = cancel, / = filter',
         fuzzy_description = 'Search State to Delete: ',
         is_fuzzy = true,
+        -- avoid the plugin's nil-arithmetic crash when the state dir is still empty
+        ignore_screen_width = false,
       })
     end),
   },
