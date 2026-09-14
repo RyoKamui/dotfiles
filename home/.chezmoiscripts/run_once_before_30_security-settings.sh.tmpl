@@ -29,7 +29,7 @@ RESET_COLOR='\033[0m'
 
 # Current and total tasks, used for progress updates
 current_event=0
-total_events=19
+total_events=18
 
 # Helper function to log progress to console
 function log_msg () {
@@ -88,23 +88,25 @@ defaults write com.apple.assistant.support 'Siri Data Sharing Opt-In Status' -in
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 log_section "Configuring Login and Account Security..."
 
-log_msg "Destroying FileVault key on standby"
-sudo pmset -a destroyfvkeyonstandby 1                                                      # Destroy FileVault key on standby for secure sleep
+# The Intel-era "secure sleep" profile (hibernatemode 25 + standby 0) defended
+# against cold-boot/DMA attacks on sleeping laptops — a threat that does not
+# exist on Apple Silicon (in-package RAM, IOMMU-mediated Thunderbolt). It cost
+# a ~16GB sleepimage write plus seconds of wake per lid close, so restore the
+# native posture; FileVault already protects data at rest.
+log_msg "Restoring native hibernation mode"
+sudo pmset -a hibernatemode 0                                                              # Native Apple Silicon sleep: no sleepimage write per lid close, instant wake
 
-log_msg "Enforcing secure hibernation mode"
-sudo pmset -a hibernatemode 25                                                             # Use secure hibernation mode (for laptops)
+log_msg "Disabling FileVault key destruction on standby"
+sudo pmset -a destroyfvkeyonstandby 0                                                      # Was a no-op while standby was disabled; back to the platform default
+
+log_msg "Enabling native standby management"
+sudo pmset -a standby 1                                                                    # Let macOS manage the long-sleep hibernation transition
 
 log_msg "Disabling Power Nap"
-sudo pmset -a powernap 0                                                                   # Disable Power Nap
-
-log_msg "Disabling standby mode"
-sudo pmset -a standby 0                                                                    # Disable standby mode
-
-log_msg "Disabling standby delay"
-sudo pmset -a standbydelay 0                                                               # Disable standby delay
+sudo pmset -a powernap 0                                                                   # Disable Power Nap: no background network activity during sleep
 
 log_msg "Disabling auto power off"
-sudo pmset -a autopoweroff 0                                                               # Disable auto power off
+sudo pmset -a autopoweroff 0                                                               # Avoid the legacy deep power-off state
 
 log_msg "Requiring password immediately after sleep"
 sudo defaults write /Library/Preferences/com.apple.screensaver askForPassword -int 1       # Require password to exit screen saver

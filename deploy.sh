@@ -140,9 +140,14 @@ fi
 # Apply configurations using chezmoi. A non-zero exit usually means the
 # deployment summary (run_once_after_99_summary) left failed stages re-armed on
 # purpose; its printed box explains what to expect, so report instead of
-# crashing the tail of the deploy
-if chezmoi -v apply; then
+# crashing the tail of the deploy. --keep-going: one failing script must not
+# starve the scripts after it (fail-soft end-to-end)
+if chezmoi -v apply --keep-going; then
     echo "✓ Deploy complete."
 else
     echo -e "\033[1;33m⚠ Deploy finished with incomplete stages — run 'chezmoi apply' again to retry them automatically.\033[0m"
 fi
+
+# Post-deploy health check: surfaces permission problems (Full Disk Access,
+# Accessibility) and config anomalies that would otherwise only surface at runtime
+chezmoi doctor || echo "WARN: 'chezmoi doctor' could not run — run it manually."

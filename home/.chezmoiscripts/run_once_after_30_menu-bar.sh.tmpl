@@ -1,216 +1,238 @@
 {{- if (eq .chezmoi.os "darwin") -}}
 #!/usr/bin/env zsh
 
-set -euo pipefail
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ■ RESTORE MENU BAR LAYOUT
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Restores menu bar status item positions via Thaw anchors and launches the menu bar apps.
+# Fail-soft: strict inside menu_bar_main, but a failure is logged for the deployment summary
+# instead of hard-aborting the whole apply — this was the only stage that could kill the deploy.
 
-log_msg() {
-    echo -e "\033[1;34m[Menu Bar]\033[0m $1"
-}
+deploy_log="$HOME/.local/state/chezmoi-deploy.log"
+mkdir -p "${deploy_log:h}"
+sed -i "" '/^menu-bar: /d' "$deploy_log" 2>/dev/null # drop last run's entries; a success now leaves no trace
 
-quit_thaw() {
-    if /usr/bin/pgrep -x Thaw >/dev/null 2>&1; then
-        /usr/bin/osascript -e 'tell application id "com.stonerl.Thaw" to quit' >/dev/null 2>&1 || true
+menu_bar_main() {
+    set -euo pipefail
+
+    log_msg() {
+        echo -e "\033[1;34m[Menu Bar]\033[0m $1"
+    }
+
+    quit_thaw() {
+        if /usr/bin/pgrep -x Thaw >/dev/null 2>&1; then
+            /usr/bin/osascript -e 'tell application id "com.stonerl.Thaw" to quit' >/dev/null 2>&1 || true
+            sleep 1
+            /usr/bin/pkill -x Thaw >/dev/null 2>&1 || true
+        fi
+    }
+
+    flush_preferences() {
+        /usr/bin/killall cfprefsd >/dev/null 2>&1 || true
         sleep 1
-        /usr/bin/pkill -x Thaw >/dev/null 2>&1 || true
-    fi
-}
+    }
 
-flush_preferences() {
-    /usr/bin/killall cfprefsd >/dev/null 2>&1 || true
-    sleep 1
-}
+    launch_bundle() {
+        local bundle_id="$1"
+        /usr/bin/open -gj -b "$bundle_id" >/dev/null 2>&1 || true
+    }
 
-launch_bundle() {
-    local bundle_id="$1"
-    /usr/bin/open -gj -b "$bundle_id" >/dev/null 2>&1 || true
-}
+    launch_menu_bar_apps() {
+        local bundle_id
 
-launch_menu_bar_apps() {
-    local bundle_id
-
-    for bundle_id in ${(f)"$(cat <<'BUNDLE_IDS'
+        for bundle_id in ${(f)"$(cat <<'BUNDLE_IDS'
 86Z3GCJ4MF.com.noodlesoft.HazelHelper
+app.updatest.Updatest
 co.highlyopinionated.swish
 com.cloudflare.1dot1dot1dot1.macos
-com.finetuneapp.FineTune
-com.macility.typinator2
 com.nektony.App-Cleaner-SIII-UIHelper
+com.nucleus.app
 com.sindresorhus.Supercharge
-com.steipete.codexbar
 com.stonerl.Thaw
 com.treasy.hovrly
-com.vehov.LookUpAnyApp
+one.ayugram.AyuGramDesktop
+org.p0deje.Maccy
 org.qbittorrent.qBittorrent
 pro.betterdisplay.BetterDisplay
-ru.keepcoder.Telegram
 BUNDLE_IDS
 )"}; do
-        launch_bundle "$bundle_id"
-    done
-}
+            launch_bundle "$bundle_id"
+        done
+    }
 
-read_int_default() {
-    local domain="$1"
-    local key="$2"
-    local value
+    read_int_default() {
+        local domain="$1"
+        local key="$2"
+        local value
 
-    value=$(/usr/bin/defaults read "$domain" "$key" 2>/dev/null) || return 1
-    [[ "$value" =~ '^-?[0-9]+$' ]] || return 1
-    printf '%s' "$value"
-}
+        value=$(/usr/bin/defaults read "$domain" "$key" 2>/dev/null) || return 1
+        [[ "$value" =~ '^-?[0-9]+$' ]] || return 1
+        printf '%s' "$value"
+    }
 
-load_position_anchors() {
-    local attempt visible hidden always
+    load_position_anchors() {
+        local attempt visible hidden always
 
-    for attempt in {1..20}; do
-        visible=$(read_int_default com.stonerl.Thaw "NSStatusItem Preferred Position Thaw.ControlItem.Visible" || true)
-        hidden=$(read_int_default com.stonerl.Thaw "NSStatusItem Preferred Position Thaw.ControlItem.Hidden" || true)
-        always=$(read_int_default com.stonerl.Thaw "NSStatusItem Preferred Position Thaw.ControlItem.AlwaysHidden" || true)
+        for attempt in {1..20}; do
+            visible=$(read_int_default com.stonerl.Thaw "NSStatusItem Preferred Position Thaw.ControlItem.Visible" || true)
+            hidden=$(read_int_default com.stonerl.Thaw "NSStatusItem Preferred Position Thaw.ControlItem.Hidden" || true)
+            always=$(read_int_default com.stonerl.Thaw "NSStatusItem Preferred Position Thaw.ControlItem.AlwaysHidden" || true)
 
-        if [[ -n "$visible" && -n "$hidden" && -n "$always" ]]; then
-            typeset -gA position_anchors=(
-                visible "$visible"
-                hidden "$hidden"
-                always "$always"
-            )
-            return 0
-        fi
+            if [[ -n "$visible" && -n "$hidden" && -n "$always" ]]; then
+                typeset -gA position_anchors=(
+                    visible "$visible"
+                    hidden "$hidden"
+                    always "$always"
+                )
+                return 0
+            fi
 
-        sleep 1
-    done
+            sleep 1
+        done
 
-    return 1
-}
+        return 1
+    }
 
-resolve_position() {
-    local spec="$1"
-    local anchor="${spec%%:*}"
-    local offset="${spec#*:}"
+    resolve_position() {
+        local spec="$1"
+        local anchor="${spec%%:*}"
+        local offset="${spec#*:}"
 
-    [[ "$offset" != "$spec" ]] || offset=0
-    [[ -n "${position_anchors[$anchor]:-}" && "$offset" =~ '^[+-]?[0-9]+$' ]] || return 1
+        [[ "$offset" != "$spec" ]] || offset=0
+        [[ -n "${position_anchors[$anchor]:-}" && "$offset" =~ '^[+-]?[0-9]+$' ]] || return 1
 
-    printf '%s' $(( position_anchors[$anchor] + offset ))
-}
+        printf '%s' $(( position_anchors[$anchor] + offset ))
+    }
 
-restore_status_item_defaults() {
-    local domain type value key resolved_value
+    restore_status_item_defaults() {
+        local domain type value key resolved_value
 
-    # Position integers are generated by the local SystemUIServer. Resolve them from
-    # local Thaw section anchors so fresh installs do not replay another machine's snapshot.
-    while IFS=$'\t' read -r domain type value key; do
-        [[ -z "$domain" || "$domain" == \#* ]] && continue
+        # Position integers are generated by the local SystemUIServer. Resolve them from
+        # local Thaw section anchors so fresh installs do not replay another machine's snapshot.
+        while IFS=$'\t' read -r domain type value key; do
+            [[ -z "$domain" || "$domain" == \#* ]] && continue
 
-        case "$type" in
-            position)
-                if resolved_value=$(resolve_position "$value"); then
-                    /usr/bin/defaults write "$domain" "$key" -int "$resolved_value"
-                fi
-                ;;
-            bool)
-                /usr/bin/defaults write "$domain" "$key" -bool "$value"
-                ;;
-            *)
-                echo "Unknown menu bar default type: $type" >&2
-                exit 1
-                ;;
-        esac
-    done <<'STATUS_ITEM_DEFAULTS'
-86Z3GCJ4MF.com.noodlesoft.HazelHelper	position	always:+5016	NSStatusItem Preferred Position Item-0
+            case "$type" in
+                position)
+                    if resolved_value=$(resolve_position "$value"); then
+                        /usr/bin/defaults write "$domain" "$key" -int "$resolved_value"
+                    fi
+                    ;;
+                bool)
+                    /usr/bin/defaults write "$domain" "$key" -bool "$value"
+                    ;;
+                *)
+                    echo "Unknown menu bar default type: $type" >&2
+                    exit 1
+                    ;;
+            esac
+        done <<'STATUS_ITEM_DEFAULTS'
+86Z3GCJ4MF.com.noodlesoft.HazelHelper	always:+5016	NSStatusItem Preferred Position Item-0
+app.updatest.Updatest	always:+5092	NSStatusItem Preferred Position Item-0
 co.highlyopinionated.swish	bool	false	NSStatusItem VisibleCC Item-0
-com.apple.Spotlight	position	always:+5000	NSStatusItem Preferred Position Item-0
-com.apple.Spotlight	bool	true	NSStatusItem VisibleCC Item-0
-com.apple.controlcenter	position	visible:-112	NSStatusItem Preferred Position Battery
-com.apple.controlcenter	position	visible:-138	NSStatusItem Preferred Position BentoBox-0
-com.apple.controlcenter	position	visible:-86	NSStatusItem Preferred Position NowPlaying
-com.apple.controlcenter	position	visible:-56	NSStatusItem Preferred Position WiFi
+com.apple.controlcenter	visible:-94	NSStatusItem Preferred Position Battery
+com.apple.controlcenter	visible:-120	NSStatusItem Preferred Position BentoBox-0
+com.apple.controlcenter	visible:-68	NSStatusItem Preferred Position WiFi
 com.apple.controlcenter	bool	true	NSStatusItem VisibleCC Battery
 com.apple.controlcenter	bool	true	NSStatusItem VisibleCC BentoBox-0
 com.apple.controlcenter	bool	true	NSStatusItem VisibleCC Clock
-com.apple.controlcenter	bool	true	NSStatusItem VisibleCC NowPlaying
 com.apple.controlcenter	bool	true	NSStatusItem VisibleCC WiFi
-com.cloudflare.1dot1dot1dot1.macos	position	hidden:+0	NSStatusItem Preferred Position Item-0
-com.finetuneapp.FineTune	position	visible:-92	NSStatusItem Preferred Position Item-0
-com.macility.typinator2	position	always:+5034	NSStatusItem Preferred Position Item-0
-com.nektony.App-Cleaner-SIII-UIHelper	position	always:+5034	NSStatusItem Preferred Position Item-0
-com.sindresorhus.Supercharge	position	visible:-69	NSStatusItem Preferred Position Item-0
-com.sindresorhus.Supercharge	position	visible:-51	NSStatusItem Preferred Position Item-1
+com.apple.Spotlight	always:+5000	NSStatusItem Preferred Position Item-0
+com.apple.Spotlight	bool	true	NSStatusItem VisibleCC Item-0
+com.cloudflare.1dot1dot1dot1.macos	visible:+8	NSStatusItem Preferred Position Item-0
+com.finetuneapp.FineTune	visible:-72	NSStatusItem Preferred Position Item-0
+com.macility.typinator2	always:+5034	NSStatusItem Preferred Position Item-0
+com.nektony.App-Cleaner-SIII-UIHelper	always:+5001	NSStatusItem Preferred Position Item-0
+com.nucleus.app	visible:+33	NSStatusItem Preferred Position Item-0
+com.sindresorhus.Supercharge	visible:-63	NSStatusItem Preferred Position Item-0
+com.sindresorhus.Supercharge	visible:-29	NSStatusItem Preferred Position Item-1
 com.sindresorhus.Supercharge	bool	false	NSStatusItem VisibleCC microphoneMute
-com.steipete.codexbar	position	visible:-18	NSStatusItem Preferred Position Item-0
-com.steipete.codexbar	bool	true	NSStatusItem VisibleCC Item-0
-com.stonerl.Thaw	position	always:+0	NSStatusItem Preferred Position Thaw.ControlItem.AlwaysHidden
-com.stonerl.Thaw	position	hidden:+0	NSStatusItem Preferred Position Thaw.ControlItem.Hidden
-com.stonerl.Thaw	position	visible:+0	NSStatusItem Preferred Position Thaw.ControlItem.Visible
-com.stonerl.Thaw	bool	true	NSStatusItem Visible Thaw.ControlItem.Hidden
-com.stonerl.Thaw	bool	true	NSStatusItem Visible Thaw.ControlItem.Visible
+com.stonerl.Thaw	always:+0	NSStatusItem Preferred Position Thaw.ControlItem.AlwaysHidden
+com.stonerl.Thaw	hidden:+0	NSStatusItem Preferred Position Thaw.ControlItem.Hidden
+com.stonerl.Thaw	visible:+0	NSStatusItem Preferred Position Thaw.ControlItem.Visible
 com.stonerl.Thaw	bool	true	NSStatusItem VisibleCC Thaw.ControlItem.AlwaysHidden
 com.stonerl.Thaw	bool	true	NSStatusItem VisibleCC Thaw.ControlItem.Hidden
 com.stonerl.Thaw	bool	true	NSStatusItem VisibleCC Thaw.ControlItem.Visible
-com.treasy.hovrly	position	always:+56	NSStatusItem Preferred Position Item-0
-com.vehov.LookUpAnyApp	position	always:+5064	NSStatusItem Preferred Position Item-0
+com.stonerl.Thaw	bool	true	NSStatusItem Visible Thaw.ControlItem.AlwaysHidden
+com.stonerl.Thaw	bool	true	NSStatusItem Visible Thaw.ControlItem.Hidden
+com.stonerl.Thaw	bool	true	NSStatusItem Visible Thaw.ControlItem.Visible
+com.treasy.hovrly	always:+24	NSStatusItem Preferred Position Item-0
+org.p0deje.Maccy	visible:-16	NSStatusItem Preferred Position Item-0
+org.p0deje.Maccy	bool	false	NSStatusItem VisibleCC Item-1
 org.qbittorrent.qBittorrent	bool	false	NSStatusItem VisibleCC Item-0
-pro.betterdisplay.BetterDisplay	position	always:-16	NSStatusItem Preferred Position Item-0
-ru.keepcoder.Telegram	position	always:+5082	NSStatusItem Preferred Position Item-0
+pro.betterdisplay.BetterDisplay	visible:+21	NSStatusItem Preferred Position Item-0
 STATUS_ITEM_DEFAULTS
-}
+    }
 
-rewrite_thaw_display_configurations() {
-    local thaw_plist="$HOME/Library/Preferences/com.stonerl.Thaw.plist"
-    local display_plist="/Library/Preferences/com.apple.windowserver.displays.plist"
+    rewrite_thaw_display_configurations() {
+        local thaw_plist="$HOME/Library/Preferences/com.stonerl.Thaw.plist"
+        local display_plist="/Library/Preferences/com.apple.windowserver.displays.plist"
 
-    [[ -f "$thaw_plist" && -f "$display_plist" ]] || return
+        [[ -f "$thaw_plist" && -f "$display_plist" ]] || return
 
-    local current_display_uuids
-    current_display_uuids=$(
-        /usr/bin/plutil -convert json -o - "$display_plist" 2>/dev/null |
-            /usr/bin/grep -Eo '"UUID":"[0-9A-F-]{36}"' |
-            /usr/bin/cut -d '"' -f 4 |
-            /usr/bin/sort -u || true
-    )
+        local current_display_uuids
+        current_display_uuids=$(
+            /usr/bin/plutil -convert json -o - "$display_plist" 2>/dev/null |
+                /usr/bin/grep -Eo '"UUID":"[0-9A-F-]{36}"' |
+                /usr/bin/cut -d '"' -f 4 |
+                /usr/bin/sort -u || true
+        )
 
-    [[ -n "$current_display_uuids" ]] || return
+        [[ -n "$current_display_uuids" ]] || return
 
-    local json="{"
-    local separator=""
-    local uuid
+        local json="{"
+        local separator=""
+        local uuid
 
-    for uuid in ${(f)current_display_uuids}; do
-        json+="${separator}\"${uuid}\":{\"iceBarLocation\":0,\"useIceBar\":true,\"alwaysShowHiddenItems\":false}"
-        separator=","
-    done
-    json+="}"
+        for uuid in ${(f)current_display_uuids}; do
+            json+="${separator}\"${uuid}\":{\"iceBarLocation\":0,\"useIceBar\":true,\"alwaysShowHiddenItems\":false}"
+            separator=","
+        done
+        json+="}"
 
-    local encoded_json
-    encoded_json=$(printf '%s' "$json" | /usr/bin/base64 | /usr/bin/tr -d '\n')
-    /usr/bin/plutil -replace DisplayIceBarConfigurations -data "$encoded_json" "$thaw_plist"
-}
+        local encoded_json
+        encoded_json=$(printf '%s' "$json" | /usr/bin/base64 | /usr/bin/tr -d '\n')
+        /usr/bin/plutil -replace DisplayIceBarConfigurations -data "$encoded_json" "$thaw_plist"
+    }
 
-restart_menu_bar_services() {
+    restart_menu_bar_services() {
+        flush_preferences
+        /usr/bin/killall SystemUIServer >/dev/null 2>&1 || true
+        sleep 2
+    }
+
+    launch_thaw() {
+        if [[ -d "/Applications/Thaw.app" ]]; then
+            /usr/bin/open -gj -b com.stonerl.Thaw >/dev/null 2>&1 || /usr/bin/open -gj -a Thaw >/dev/null 2>&1 || true
+        fi
+    }
+
+    log_msg "Restoring status item positions..."
+    quit_thaw
     flush_preferences
-    /usr/bin/killall SystemUIServer >/dev/null 2>&1 || true
-    sleep 2
-}
-
-launch_thaw() {
-    if [[ -d "/Applications/Thaw.app" ]]; then
-        /usr/bin/open -gj -b com.stonerl.Thaw >/dev/null 2>&1 || /usr/bin/open -gj -a Thaw >/dev/null 2>&1 || true
+    launch_thaw
+    sleep 3
+    launch_menu_bar_apps
+    flush_preferences
+    if load_position_anchors; then
+        restore_status_item_defaults
+    else
+        log_msg "Skipping status item positions because Thaw anchors are unavailable."
     fi
+    rewrite_thaw_display_configurations
+    restart_menu_bar_services
+    launch_thaw
+    log_msg "Menu bar layout restore complete."
 }
 
-log_msg "Restoring status item positions..."
-quit_thaw
-flush_preferences
-launch_thaw
-sleep 3
-launch_menu_bar_apps
-flush_preferences
-if load_position_anchors; then
-    restore_status_item_defaults
-else
-    log_msg "Skipping status item positions because Thaw anchors are unavailable."
+# Convert any hard failure into a log entry + exit 0, so this stage can never
+# abort the apply — the summary reports it and the printed command re-runs it.
+menu_bar_status=0
+trap 'menu_bar_status=$?; if (( menu_bar_status != 0 )); then
+    echo -e "\033[1;31m[FAIL]\033[0m Menu bar restore failed (exit ${menu_bar_status}) — logged; deploy continues"
+    echo "menu-bar: restore failed (exit ${menu_bar_status}) — re-run: chezmoi state delete --bucket=scriptState --key=\"\$(chezmoi state get --bucket=entryState --key=\"\$HOME/.chezmoiscripts/30_menu-bar.sh\" | jq -r .contentsSHA256)\" && chezmoi apply" >> "$deploy_log"
 fi
-rewrite_thaw_display_configurations
-restart_menu_bar_services
-launch_thaw
-log_msg "Menu bar layout restore complete."
+exit 0' EXIT
+
+menu_bar_main
 {{ end -}}

@@ -47,6 +47,26 @@ function log_section () {
   fi
 }
 
+# pb_set <plist> <key.path> <type> <value>: set a leaf value, creating any
+# missing intermediate dictionaries and the leaf itself. A bare "Set" fails on
+# a fresh machine where Finder has not saved its view settings yet.
+function pb_set () {
+  local pb=/usr/libexec/PlistBuddy plist="$1" keypath="$2" type="$3" value="$4" prefix="" seg i
+  local -a segs
+  segs=("${(s.:.)keypath}")
+  "$pb" -c "Set :$keypath $value" "$plist" 2>/dev/null && return 0
+  for (( i = 1; i <= ${#segs} - 1; i++ )); do
+    seg="${segs[i]}"
+    if [[ -n "$prefix" ]]; then
+      "$pb" -c "Add :$prefix:$seg dict" "$plist" 2>/dev/null
+    else
+      "$pb" -c "Add :$seg dict" "$plist" 2>/dev/null
+    fi
+    prefix="${prefix:+$prefix:}$seg"
+  done
+  "$pb" -c "Add :$keypath $type $value" "$plist" 2>/dev/null
+}
+
 # ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 # Execution Start
 # ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -145,43 +165,43 @@ log_msg "Opening new Finder window for new disks"
 defaults write com.apple.finder OpenWindowForNewRemovableDisk -bool true                # Open new window for removable disks
 
 log_msg "Showing item info below desktop icons"
-/usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:showItemInfo true" ~/Library/Preferences/com.apple.finder.plist      # Show item info on desktop
+pb_set ~/Library/Preferences/com.apple.finder.plist DesktopViewSettings:IconViewSettings:showItemInfo bool true      # Show item info on desktop
 
 log_msg "Showing item info in Finder icon views"
-/usr/libexec/PlistBuddy -c "Set :FK_StandardViewSettings:IconViewSettings:showItemInfo true" ~/Library/Preferences/com.apple.finder.plist  # Show item info in foreign key views
+pb_set ~/Library/Preferences/com.apple.finder.plist FK_StandardViewSettings:IconViewSettings:showItemInfo bool true  # Show item info in foreign key views
 
 log_msg "Showing item info in standard icon views"
-/usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:showItemInfo true" ~/Library/Preferences/com.apple.finder.plist     # Show item info in standard views
+pb_set ~/Library/Preferences/com.apple.finder.plist StandardViewSettings:IconViewSettings:showItemInfo bool true     # Show item info in standard views
 
 log_msg "Placing icon labels on the right side"
-/usr/libexec/PlistBuddy -c "Set DesktopViewSettings:IconViewSettings:labelOnBottom false" ~/Library/Preferences/com.apple.finder.plist     # Set icon label position
+pb_set ~/Library/Preferences/com.apple.finder.plist DesktopViewSettings:IconViewSettings:labelOnBottom bool false    # Set icon label position
 
 log_msg "Enabling snap-to-grid on the desktop"
-/usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:arrangeBy grid" ~/Library/Preferences/com.apple.finder.plist         # Enable desktop snap-to-grid
+pb_set ~/Library/Preferences/com.apple.finder.plist DesktopViewSettings:IconViewSettings:arrangeBy string grid       # Enable desktop snap-to-grid
 
 log_msg "Enabling snap-to-grid in Finder icon views"
-/usr/libexec/PlistBuddy -c "Set :FK_StandardViewSettings:IconViewSettings:arrangeBy grid" ~/Library/Preferences/com.apple.finder.plist     # Enable foreign key view snap-to-grid
+pb_set ~/Library/Preferences/com.apple.finder.plist FK_StandardViewSettings:IconViewSettings:arrangeBy string grid   # Enable foreign key view snap-to-grid
 
 log_msg "Enabling snap-to-grid in standard icon views"
-/usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:arrangeBy grid" ~/Library/Preferences/com.apple.finder.plist        # Enable standard view snap-to-grid
+pb_set ~/Library/Preferences/com.apple.finder.plist StandardViewSettings:IconViewSettings:arrangeBy string grid      # Enable standard view snap-to-grid
 
 log_msg "Setting desktop grid spacing to 100px"
-/usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:gridSpacing 100" ~/Library/Preferences/com.apple.finder.plist        # Set desktop grid spacing
+pb_set ~/Library/Preferences/com.apple.finder.plist DesktopViewSettings:IconViewSettings:gridSpacing real 100        # Set desktop grid spacing
 
 log_msg "Setting Finder grid spacing to 100px"
-/usr/libexec/PlistBuddy -c "Set :FK_StandardViewSettings:IconViewSettings:gridSpacing 100" ~/Library/Preferences/com.apple.finder.plist    # Set foreign key view grid spacing
+pb_set ~/Library/Preferences/com.apple.finder.plist FK_StandardViewSettings:IconViewSettings:gridSpacing real 100    # Set foreign key view grid spacing
 
 log_msg "Setting standard view grid spacing to 100px"
-/usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:gridSpacing 100" ~/Library/Preferences/com.apple.finder.plist       # Set standard view grid spacing
+pb_set ~/Library/Preferences/com.apple.finder.plist StandardViewSettings:IconViewSettings:gridSpacing real 100       # Set standard view grid spacing
 
 log_msg "Setting desktop icon size to 80px"
-/usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:iconSize 80" ~/Library/Preferences/com.apple.finder.plist            # Set desktop icon size
+pb_set ~/Library/Preferences/com.apple.finder.plist DesktopViewSettings:IconViewSettings:iconSize integer 80         # Set desktop icon size
 
 log_msg "Setting Finder icon size to 80px"
-/usr/libexec/PlistBuddy -c "Set :FK_StandardViewSettings:IconViewSettings:iconSize 80" ~/Library/Preferences/com.apple.finder.plist        # Set foreign key view icon size
+pb_set ~/Library/Preferences/com.apple.finder.plist FK_StandardViewSettings:IconViewSettings:iconSize integer 80     # Set foreign key view icon size
 
 log_msg "Setting standard view icon size to 80px"
-/usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:iconSize 80" ~/Library/Preferences/com.apple.finder.plist           # Set standard view icon size
+pb_set ~/Library/Preferences/com.apple.finder.plist StandardViewSettings:IconViewSettings:iconSize integer 80        # Set standard view icon size
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ■ SECTION: SAFARI & WEBKIT

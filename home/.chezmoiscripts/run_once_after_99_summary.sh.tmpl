@@ -1,24 +1,39 @@
 {{- if (eq .chezmoi.os "darwin") -}}
 #!/usr/bin/env zsh
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ■ DEPLOYMENT SUMMARY
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Runs last in the chain and prints everything the fail-soft scripts
 # recorded in the shared log, so incomplete stages are impossible to miss.
 # When failures exist it also drives the automatic retry: chezmoi only
-# writes a script's run_once record after that script exits successfully,
-# so the way to keep a stage armed for re-run is to leave its key deleted
-# when the apply finishes. This script is last, so it deletes the armed
-# keys after its nested retry pass and then exits non-zero — that keeps
-# its own record unwritten too, and the whole retry loop repeats on the
-# next 'chezmoi apply' until every stage is green. The CHEZMOI_DEPLOY_RETRY
-# marker gives the nested pass a single retry per apply so nothing spirals.
+# writes a script's run-once record after that script exits successfully,
+# so a soft-failed (exit-0) stage is re-armed by deleting that record. The
+# records live in the scriptState bucket, keyed by the script's content
+# SHA256 (there is no "run_once" bucket), and entryState already stores the
+# hash for each script's target path — rearm_run_once reads it from there.
+# This script deletes the armed records BEFORE its nested retry pass, so
+# the nested 'chezmoi apply' genuinely re-runs them, and again after the
+# pass if they still failed, then exits non-zero — that keeps its own
+# record unwritten too, and the cycle repeats on the next 'chezmoi apply'
+# until every stage is green. The CHEZMOI_DEPLOY_RETRY marker gives the
+# nested pass a single retry per apply so nothing spirals.
 # Every script rewrites only its own log prefix when it runs, so the log is
 # the current status of every stage, never a stale list. Stages that intentionally do not self-heal (huge builds, app
 # installs) print their own manual re-run command into the log instead.
 
 deploy_log="$HOME/.local/state/chezmoi-deploy.log"
+
+# rearm_run_once <target path>: delete a script's run-once record so the next
+# apply re-runs it. The key is the script's content SHA256, which entryState
+# already holds for the target path — no need to recompute it.
+rearm_run_once() {
+    local hash
+    hash=$(chezmoi state get --bucket=entryState --key="$1" 2>/dev/null | jq -r '.contentsSHA256 // empty' 2>/dev/null)
+    [[ -n "$hash" ]] && chezmoi state delete --bucket=scriptState --key="$hash" 2>/dev/null
+}
+
+init_target="$HOME/.chezmoiscripts/10_init.sh"
 
 if [[ ! -s "$deploy_log" ]]; then
     echo -e "\033[1;32m✔ Deployment complete — every stage succeeded.\033[0m"
@@ -30,6 +45,13 @@ echo -e "\033[1;33m┏━━ Deployment finished with $(wc -l < "$deploy_log" | 
 while IFS= read -r line; do
     echo -e "  \033[1;31m✗\033[0m $line"
 done < "$deploy_log"
+
+# Re-arm BEFORE the nested pass: the soft-failed stages already have their
+# records written (they exited 0), so the nested apply would skip them unless
+# their records are deleted first.
+if grep -q '^init: ' "$deploy_log"; then
+    rearm_run_once "$init_target"
+fi
 
 if [[ -n "${CHEZMOI_DEPLOY_RETRY:-}" ]]; then
     echo -e "\033[1;33m┃ Still failing after the automatic retry — everything stays re-armed for the next apply.\033[0m"
@@ -46,15 +68,15 @@ else
     fi
 fi
 echo -e "\033[1;33m┃ Full log: ${deploy_log}\033[0m"
-echo -e "\033[1;33m┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m"
+echo -e "\033[1;33m┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m"
 
-# Keep the loop alive: the nested apply re-recorded any armed script that ran,
-# so delete those keys again (only for stages that log self-heals, currently
-# init), then exit non-zero so this script's own record stays unwritten. The
-# next 'chezmoi apply' re-runs both, repeating retry passes until the log is
-# empty — at which point this script exits 0 and everything settles.
+# Keep the loop alive: if a self-healing stage still fails after the retry
+# pass, delete its run-once record again so the next 'chezmoi apply' re-runs
+# it, then exit non-zero so this script's own record stays unwritten too. The
+# next apply repeats the cycle until the log is empty — at which point this
+# script exits 0 and everything settles.
 if grep -q '^init: ' "$deploy_log"; then
-    chezmoi state delete --bucket=run_once --key="$HOME/.chezmoiscripts/10_init.sh" 2>/dev/null
+    rearm_run_once "$init_target"
 fi
 exit 1
 {{ end -}}
